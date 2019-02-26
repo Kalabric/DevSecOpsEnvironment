@@ -1,4 +1,4 @@
-# DevOps Openhack Proctor Repository
+# DevSecOps Environment Provisioning Repository
 
 This repo contains the code for the provisioning of the resources necessary to build the DevSecOps environment needed for the My Health Clinic application.
 

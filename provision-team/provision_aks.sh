@@ -84,7 +84,7 @@ if [ -f "~/.azure/aksServicePrincipal.json" ]; then
     echo "renamed existing local AKS Service Principal to ~/.azure/aksServicePrincipal_"$NOW".json"
 fi
 
-teamName=${resourceGroupName:0:-2}
+RgName=${resourceGroupName:0:-2}
 
 # Create SPN if not provided
 if [ -z "${appName}" ] || [ -z "${appId}" ] || [ -z "${appPassword}" ]; then
@@ -103,19 +103,19 @@ fi
 echo "Service Principal Name: " $SP_NAME
 echo "Service Principal Password: " $SP_PASS
 echo "Service Principal Id: " $SP_ID
-kvstore set ${teamName} SPName ${SP_NAME}
-kvstore set ${teamName} SPPass ${SP_PASS}
-kvstore set ${teamName} SPID ${SP_ID}
+kvstore set ${RgName} SPName ${SP_NAME}
+kvstore set ${RgName} SPPass ${SP_PASS}
+kvstore set ${RgName} SPID ${SP_ID}
 
 echo "Retrieving Registry ID..."
 
-ACR_ID="$(az acr show -n ${teamName}acr -g $resourceGroupName --query "id" --output tsv)"
+ACR_ID="$(az acr show -n ${RgName}acr -g $resourceGroupName --query "id" --output tsv)"
 
 echo "Registry Id:"$ACR_ID
 
-kvstore set ${teamName} ACR_URI $ACR_ID
+kvstore set ${RgName} ACR_URI $ACR_ID
 
-echo "Granting Service Princpal " $SP_NAME " access to ACR " $teamName"acr" "..."
+echo "Granting Service Princpal " $SP_NAME " access to ACR " $RgName"acr" "..."
 (
     set -x
     az role assignment create --assignee $SP_ID --role acrpull --scope $ACR_ID

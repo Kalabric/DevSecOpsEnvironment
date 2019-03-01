@@ -3,13 +3,12 @@
 # set -euo pipefail
 IFS=$'\n\t'
 
-usage() { echo "Usage: setup.sh -i <subscriptionId> -l <resourceGroupLocation> -n <teamName> -e <teamNumber> -r <recipientEmail> -c <chatConnectionString> -q <chatMessageQueue> -u <azureUserName> -p <azurePassword> -j <bingAPIkey> -t <tenantId>" 1>&2; exit 1; }
+usage() { echo "Usage: setup.sh -i <subscriptionId> -l <resourceGroupLocation> -n <envName> -r <recipientEmail> -c <chatConnectionString> -q <chatMessageQueue> -u <azureUserName> -p <azurePassword> -j <bingAPIkey> -t <tenantId> -d <dbName>" 1>&2; exit 1; }
 echo "$@"
 
 declare subscriptionId=""
 declare resourceGroupLocation=""
-declare teamName=""
-declare teamNumber=""
+declare envName=""
 declare azcliVerifiedVersion="2.0.43"
 declare azureUserName=""
 declare azurePassword=""
@@ -20,9 +19,10 @@ declare provisioningVMIpaddress=""
 declare bingAPIkey=""
 declare tenantId=""
 declare appId=""
+declare dbName=""
 
 # Initialize parameters specified from command line
-while getopts ":a:c:i:l:n:e:q:r:t:u:p:j:" arg; do
+while getopts ":a:c:i:l:n:e:q:r:t:u:p:j:d:" arg; do
     case "${arg}" in
         a)
             appId=${OPTARG}
@@ -37,10 +37,7 @@ while getopts ":a:c:i:l:n:e:q:r:t:u:p:j:" arg; do
             resourceGroupLocation=${OPTARG}
         ;;
         n)
-            teamName=${OPTARG}
-        ;;
-        e)
-            teamNumber=${OPTARG}
+            envName=${OPTARG}
         ;;
         q)
             chatMessageQueue=${OPTARG}
@@ -59,6 +56,9 @@ while getopts ":a:c:i:l:n:e:q:r:t:u:p:j:" arg; do
         ;;
         j)
             bingAPIkey=${OPTARG}
+        ;;
+        d)
+            dbName=${OPTARG}
         ;;
     esac
 done
@@ -110,12 +110,12 @@ fi
 #    read resourceGroupLocation
 #fi
 #
-#if [[ -z "$teamName" ]]; then
+#if [[ -z "$envName" ]]; then
 #    echo "Enter a team name to be used in app provisioning:"
-#    read teamName
+#    read envName
 #fi
 #
-#if [ -z "$subscriptionId" ] || [ -z "$resourceGroupLocation" ] || [ -z "$teamName" ] ; then
+#if [ -z "$subscriptionId" ] || [ -z "$resourceGroupLocation" ] || [ -z "$envName" ] ; then
 #    echo "Parameter missing..."
 #    usage
 #fi
@@ -136,21 +136,15 @@ randomCharUpper() {
     echo -n ${s:$p:1}
 }
 
-if [[ -z "$teamNumber" ]]; then
-    echo "Using a random team number since not specified."
-    teamNumber="$(randomChar;randomChar;randomChar;randomNum;)"
-fi
-
-declare resourceGroupTeam="${teamName}${teamNumber}rg";
-declare registryName="${teamName}${teamNumber}acr"
-declare clusterName="${teamName}${teamNumber}aks"
-declare keyVaultName="${teamName}${teamNumber}kv"
-declare sqlServerName="${teamName}${teamNumber}sql"
-declare sqlServerUsername="${teamName}${teamNumber}sa"
+declare resourceGroupName="${envName}rg";
+declare registryName="${envName}acr"
+declare clusterName="${envName}aks"
+declare keyVaultName="${envName}kv"
+declare sqlServerName="${envName}sql"
+declare sqlServerUsername="${envName}sa"
 declare sqlServerPassword="$(randomChar;randomCharUpper;randomNum;randomChar;randomChar;randomNum;randomCharUpper;randomChar;randomNum)pwd"
-declare sqlDBName="mydrivingDB"
-declare jenkinsVMPassword="$(randomChar;randomCharUpper;randomNum;randomChar;randomChar;randomNum;randomCharUpper;randomChar;randomNum)pwd"
-declare jenkinsURL="jenkins${teamName}${teamNumber}"
+#SQLDBName will need to reflect the necessary DB name for the MH Application
+declare sqlDBName="${dbName}"
 declare zipPassword=$(< /dev/urandom tr -dc '!@#$%_A-Z-a-z-0-9' | head -c${1:-32};echo;)
 
 echo "=========================================="
@@ -158,18 +152,16 @@ echo " VARIABLES"
 echo "=========================================="
 echo "subscriptionId            = "${subscriptionId}
 echo "resourceGroupLocation     = "${resourceGroupLocation}
-echo "teamName                  = "${teamName}
+echo "envName                   = "${envName}
 echo "teamNumber                = "${teamNumber}
 echo "keyVaultName              = "${keyVaultName}
-echo "resourceGroupTeam         = "${resourceGroupTeam}
+echo "resourceGroupName         = "${resourceGroupName}
 echo "registryName              = "${registryName}
 echo "clusterName               = "${clusterName}
 echo "sqlServerName             = "${sqlServerName}
 echo "sqlServerUsername         = "${sqlServerUsername}
 echo "sqlServerPassword         = "${sqlServerPassword}
 echo "sqlDBName                 = "${sqlDBName}
-echo "jenkinsVMPassword         = "${jenkinsVMPassword}
-echo "jenkinsURL                = "${jenkinsURL}.${resourceGroupLocation}.cloudapp.azure.com:8080
 echo "recipientEmail            = "${recipientEmail}
 echo "chatConnectionString      = "${chatConnectionString}
 echo "chatMessageQueue          = "${chatMessageQueue}
@@ -205,103 +197,93 @@ az provider register -n Microsoft.ContainerService
 set +e
 
 #Check for existing RG
-if [ `az group exists -n $resourceGroupTeam -o tsv` == false ]; then
-    echo "Resource group with name" $resourceGroupTeam "could not be found. Creating new resource group.."
+if [ `az group exists -n $resourceGroupName -o tsv` == false ]; then
+    echo "Resource group with name" $resourceGroupName "could not be found. Creating new resource group.."
     set -e
     (
         set -x
-        az group create --name $resourceGroupTeam --location $resourceGroupLocation
+        az group create --name $resourceGroupName --location $resourceGroupLocation
     )
 else
     echo "Using existing resource group..."
 fi
 
-# Verify that the teamConfig dir exist
-if [ ! -d "/home/azureuser/team_env" ]; then
-   mkdir /home/azureuser/team_env
+# Verify that the devopsConfig dir exist
+if [ ! -d "/home/azureuser/devops_env" ]; then
+   mkdir /home/azureuser/devops_env
 fi
 
 # Verify that kvstore dir exist
-if [ ! -d "/home/azureuser/team_env/kvstore" ]; then
-   mkdir /home/azureuser/team_env/kvstore
+if [ ! -d "/home/azureuser/devops_env/kvstore" ]; then
+   mkdir /home/azureuser/devops_env/kvstore
 fi
 
-# Verify that the team dir exist
-if [ ! -d "/home/azureuser/team_env/${teamName}${teamNumber}" ]; then
-   mkdir /home/azureuser/team_env/${teamName}${teamNumber}
+# Verify that the devops dir exist
+if [ ! -d "/home/azureuser/devops_env/${envName}${teamNumber}" ]; then
+   mkdir /home/azureuser/devops_env/${envName}${teamNumber}
 fi
 
-kvstore set ${teamName}${teamNumber} subscriptionId ${subscriptionId}
-kvstore set ${teamName}${teamNumber} tenantId ${tenantId}
-kvstore set ${teamName}${teamNumber} resourceGroupLocation ${resourceGroupLocation}
-kvstore set ${teamName}${teamNumber} teamNumber ${teamNumber}
-kvstore set ${teamName}${teamNumber} keyVaultName ${keyVaultName}
-kvstore set ${teamName}${teamNumber} resourceGroup ${resourceGroupTeam}
-kvstore set ${teamName}${teamNumber} ACR ${registryName}
-kvstore set ${teamName}${teamNumber} AKS ${clusterName}
-kvstore set ${teamName}${teamNumber} sqlServerName ${sqlServerName}
-kvstore set ${teamName}${teamNumber} sqlServerUserName ${sqlServerUsername}
-kvstore set ${teamName}${teamNumber} sqlServerPassword ${sqlServerPassword}
-kvstore set ${teamName}${teamNumber} sqlDbName ${sqlDBName}
-kvstore set ${teamName}${teamNumber} teamFiles /home/azureuser/team_env/${teamName}${teamNumber}
-kvstore set ${teamName}${teamNumber} jenkinsVMPassword ${jenkinsVMPassword}
-kvstore set ${teamName}${teamNumber} jenkinsURL ${jenkinsURL}.${resourceGroupLocation}.cloudapp.azure.com
+kvstore set ${envName}${teamNumber} subscriptionId ${subscriptionId}
+kvstore set ${envName}${teamNumber} tenantId ${tenantId}
+kvstore set ${envName}${teamNumber} resourceGroupLocation ${resourceGroupLocation}
+kvstore set ${envName}${teamNumber} teamNumber ${teamNumber}
+kvstore set ${envName}${teamNumber} keyVaultName ${keyVaultName}
+kvstore set ${envName}${teamNumber} resourceGroup ${resourceGroupName}
+kvstore set ${envName}${teamNumber} ACR ${registryName}
+kvstore set ${envName}${teamNumber} AKS ${clusterName}
+kvstore set ${envName}${teamNumber} sqlServerName ${sqlServerName}
+kvstore set ${envName}${teamNumber} sqlServerUserName ${sqlServerUsername}
+kvstore set ${envName}${teamNumber} sqlServerPassword ${sqlServerPassword}
+kvstore set ${envName}${teamNumber} sqlDbName ${sqlDBName}
+kvstore set ${envName}${teamNumber} teamFiles /home/azureuser/team_env/${envName}${teamNumber}
+
 
 az configure --defaults 'output=json'
-
-echo "0-Provision KeyVault  (bash ./provision_kv.sh -i $subscriptionId -g $resourceGroupTeam -k $keyVaultName -l $resourceGroupLocation)"
-bash ./provision_kv.sh -i $subscriptionId -g $resourceGroupTeam -k $keyVaultName -l $resourceGroupLocation
-
-echo "1-Provision ACR  (bash ./provision_acr.sh -i $subscriptionId -g $resourceGroupTeam -r $registryName -l $resourceGroupLocation)"
-bash ./provision_acr.sh -i $subscriptionId -g $resourceGroupTeam -r $registryName -l $resourceGroupLocation
-
-echo "2-Provision AKS  (bash ./provision_aks.sh -i $subscriptionId -g $resourceGroupTeam -c $clusterName -l $resourceGroupLocation)"
-bash ./provision_aks.sh -i $subscriptionId -g $resourceGroupTeam -c $clusterName -l $resourceGroupLocation -a $appId -n $azureUserName -p $azurePassword
+#Done
+echo "0-Provision KeyVault  (bash ./provision_kv.sh -i $subscriptionId -g $resourceGroupName -k $keyVaultName -l $resourceGroupLocation)"
+bash ./provision_kv.sh -i $subscriptionId -g $resourceGroupName -k $keyVaultName -l $resourceGroupLocation
+#Done
+echo "1-Provision ACR  (bash ./provision_acr.sh -i $subscriptionId -g $resourceGroupName -r $registryName -l $resourceGroupLocation)"
+bash ./provision_acr.sh -i $subscriptionId -g $resourceGroupName -r $registryName -l $resourceGroupLocation
+#Done
+echo "2-Provision AKS  (bash ./provision_aks.sh -i $subscriptionId -g $resourceGroupName -c $clusterName -l $resourceGroupLocation)"
+bash ./provision_aks.sh -i $subscriptionId -g $resourceGroupName -c $clusterName -l $resourceGroupLocation -a $appId -n $azureUserName -p $azurePassword
 
 echo "5-Clone repo"
-bash ./git_fetch.sh -u https://github.com/Azure-Samples/openhack-devops-team -s ./test_fetch_build
+bash ./git_fetch.sh -u https://github.com/Kalabric/DevSecOpsEnvironment -s ./test_fetch_build
 
-echo "6-Deploy ingress  (bash ./deploy_ingress_dns.sh -s ./test_fetch_build -l $resourceGroupLocation -n ${teamName}${teamNumber})"
-bash ./deploy_ingress_dns.sh -s ./test_fetch_build -l $resourceGroupLocation -n ${teamName}${teamNumber}
+echo "6-Deploy ingress  (bash ./deploy_ingress_dns.sh -s ./test_fetch_build -l $resourceGroupLocation -n ${envName}${teamNumber})"
+bash ./deploy_ingress_dns.sh -s ./test_fetch_build -l $resourceGroupLocation -n ${envName}${teamNumber}
 
-echo "7-Provision SQL (bash ./provision_sql.sh -s ./test_fetch_build -g $resourceGroupTeam -l $resourceGroupLocation -q $sqlServerName -k $keyVaultName -u $sqlServerUsername -p $sqlServerPassword -d $sqlDBName)"
-bash ./provision_sql.sh -g $resourceGroupTeam -l $resourceGroupLocation -q $sqlServerName -k $keyVaultName -u $sqlServerUsername -p $sqlServerPassword -d $sqlDBName
+echo "7-Provision SQL (bash ./provision_sql.sh -s ./test_fetch_build -g $resourceGroupName -l $resourceGroupLocation -q $sqlServerName -k $keyVaultName -u $sqlServerUsername -p $sqlServerPassword -d $sqlDBName)"
+bash ./provision_sql.sh -g $resourceGroupName -l $resourceGroupLocation -q $sqlServerName -k $keyVaultName -u $sqlServerUsername -p $sqlServerPassword -d $sqlDBName
 
-echo "8-Configure SQL  (bash ./configure_sql.sh -s ./test_fetch_build -g $resourceGroupTeam -u $sqlServerUsername -n ${teamName}${teamNumber} -k $keyVaultName -d $sqlDBName)"
-bash ./configure_sql.sh -s ./test_fetch_build -g $resourceGroupTeam -u $sqlServerUsername -n ${teamName}${teamNumber} -k $keyVaultName -d $sqlDBName
+echo "8-Configure SQL  (bash ./configure_sql.sh -s ./test_fetch_build -g $resourceGroupName -u $sqlServerUsername -n ${envName}${teamNumber} -k $keyVaultName -d $sqlDBName)"
+bash ./configure_sql.sh -s ./test_fetch_build -g $resourceGroupName -u $sqlServerUsername -n ${envName}${teamNumber} -k $keyVaultName -d $sqlDBName
 
 # Save the public DNS address to be provisioned in the helm charts for each service
-dnsURL='akstraefik'${teamName}${teamNumber}'.'$resourceGroupLocation'.cloudapp.azure.com'
-echo -e "DNS URL for "${teamName}" is:\n"$dnsURL
+dnsURL='akstraefik'${envName}${teamNumber}'.'$resourceGroupLocation'.cloudapp.azure.com'
+echo -e "DNS URL for "${envName}" is:\n"$dnsURL
 
-kvstore set ${teamName}${teamNumber} endpoint ${dnsURL}
+kvstore set ${envName}${teamNumber} endpoint ${dnsURL}
 
-echo "9-Build and deploy POI API to AKS  (bash ./build_deploy_poi.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-poi' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName)"
-bash ./build_deploy_poi.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-poi' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName
+echo "9-Build and deploy POI API to AKS  (bash ./build_deploy_poi.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-poi' -d $dnsURL -n ${envName}${teamNumber} -g $registryName)"
+bash ./build_deploy_poi.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-poi' -d $dnsURL -n ${envName}${teamNumber} -g $registryName
 
-echo "10-Build and deploy User API to AKS  (bash ./build_deploy_user.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-user' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName)"
-bash ./build_deploy_user.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-user' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName
+echo "10-Build and deploy User API to AKS  (bash ./build_deploy_user.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-user' -d $dnsURL -n ${envName}${teamNumber} -g $registryName)"
+bash ./build_deploy_user.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-user' -d $dnsURL -n ${envName}${teamNumber} -g $registryName
 
-echo "11-Build and deploy Trip API to AKS  (# bash ./build_deploy_trip.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-trip' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName)"
-bash ./build_deploy_trip.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-trip' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName
+echo "11-Build and deploy Trip API to AKS  (# bash ./build_deploy_trip.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-trip' -d $dnsURL -n ${envName}${teamNumber} -g $registryName)"
+bash ./build_deploy_trip.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-trip' -d $dnsURL -n ${envName}${teamNumber} -g $registryName
 
-echo "12-Build and deploy User-Profile API to AKS  (# bash ./build_deploy_user-profile.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-userprofile' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName)"
-bash ./build_deploy_user-java.sh -s ./test_fetch_build -b Release -r $resourceGroupTeam -t 'api-user-java' -d $dnsURL -n ${teamName}${teamNumber} -g $registryName
+echo "12-Build and deploy User-Profile API to AKS  (# bash ./build_deploy_user-profile.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-userprofile' -d $dnsURL -n ${envName}${teamNumber} -g $registryName)"
+bash ./build_deploy_user-java.sh -s ./test_fetch_build -b Release -r $resourceGroupName -t 'api-user-java' -d $dnsURL -n ${envName}${teamNumber} -g $registryName
 
-echo "13-Build and deploy Tripviewer website to AKS (# bash ./build_deploy_tripviewer.sh -m ${teamName}${teamNumber} -d $dnsURL -j $bingAPIkey)"
-bash ./build_deploy_tripviewer.sh -m ${teamName}${teamNumber} -d $dnsURL -j $bingAPIkey
-
-echo "14-Build and deploy the simulator (# bash Usage: build_deploy_simulator.sh -n ${teamName}${teamNumber} -q 18000 -d $dnsURL -t <image tag optional>)"
-bash ./build_deploy_simulator.sh -n ${teamName}${teamNumber} -q '18000' -d $dnsURL
-
-echo "15-Deploy Jenkins VM (# bash ./deploy_jenkins.sh -g $resourceGroupTeam -l $resourceGroupLocation -p $jenkinsVMPassword -u $jenkinsURL) "
-bash ./deploy_jenkins.sh -g ${resourceGroupTeam} -l ${resourceGroupLocation} -p ${jenkinsVMPassword} -u ${jenkinsURL}
-
-echo "16-Check services (# bash ./service_check.sh -d ${dnsURL} -n ${teamName}${teamNumber})"
-bash ./service_check.sh -d ${dnsURL} -n ${teamName}${teamNumber}
+echo "16-Check services (# bash ./service_check.sh -d ${dnsURL} -n ${envName}${teamNumber})"
+bash ./service_check.sh -d ${dnsURL} -n ${envName}${teamNumber}
 
 echo "17-Clean the working environment"
-bash ./cleanup_environment.sh -t ${teamName}${teamNumber} -p $zipPassword
+bash ./cleanup_environment.sh -t ${envName}${teamNumber} -p $zipPassword
 
 echo "18-Expose the team settings on a website"
 bash ./run_nginx.sh

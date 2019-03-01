@@ -8,7 +8,7 @@ AZUREUSERNAME=$1
 AZUREPASSWORD=$2
 SUBID=$3
 LOCATION=$4
-TEAMNAME=$5
+DEVSECOPSENVNAME=$5
 RECIPIENTEMAIL=$6
 CHATCONNECTIONSTRING=$7
 CHATMESSAGEQUEUE=$8
@@ -54,13 +54,13 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce
 touch /home/azureuser/.bashrc
 echo 'export PATH=$PATH:/opt/mssql-tools/bin' >> /home/azureuser/.bashrc
 
-echo "############### Pulling Openhack-tools from Github ###############"
-sudo git clone https://github.com/Azure-Samples/openhack-devops-proctor.git /home/azureuser/openhack-devops-proctor
-sudo chown azureuser:azureuser -R /home/azureuser/openhack-devops-proctor/.
+echo "############### Pulling DevSecOpsEnvironment-tools from Github ###############"
+sudo git clone https://github.com/Kalabric/DevSecOpsEnvironment.git /home/azureuser/DevSecOpsEnvironment
+sudo chown azureuser:azureuser -R //home/azureuser/MHDevSecOpsEnv/.
 
 echo "############### Install kvstore ###############"
-sudo install -b /home/azureuser/openhack-devops-proctor/provision-team/kvstore.sh /usr/local/bin/kvstore
-echo 'export KVSTORE_DIR=/home/azureuser/team_env/kvstore' >> /home/azureuser/.bashrc
+sudo install -b /home/azureuser/MHDevSecOpsEnv/provision-DevSecOpsEnvironment/kvstore.sh /usr/local/bin/kvstore
+echo 'export KVSTORE_DIR=/home/azureuser/DevSecOpsEnvironment/kvstore' >> /home/azureuser/.bashrc
 
 echo azure-cli hold | sudo dpkg --set-selections
 
@@ -73,23 +73,23 @@ sudo apt-get upgrade -y
 
 #Set environement variables
 export PATH=$PATH:/opt/mssql-tools/bin
-export KVSTORE_DIR=/home/azureuser/team_env/kvstore
+export KVSTORE_DIR=/home/azureuser/DevSecOpsEnvironment/kvstore
 
-cd /home/azureuser/openhack-devops-proctor/provision-team
+cd /home/azureuser/DevSecOpsEnvironment/provision
 
 echo "############### Azure credentials ###############"
 echo "UserName: $AZUREUSERNAME"
 echo "Password: $AZUREPASSWORD"
 echo "Subscription ID: $SUBID"
 echo "Location: $LOCATION"
-echo "Team Name: $TEAMNAME"
+echo "DevOps EnvName: $DEVSECOPSENVNAME"
 echo "Recipient email: $RECIPIENTEMAIL"
 echo "ChatConnectionString= $CHATCONNECTIONSTRING"
 echo "ChatConnectionQueue= $CHATMESSAGEQUEUE"
 echo "Tenant is $TENANTID"
 echo "AppId is $APPID"
 
-# Running the provisioning of the team environment
+# Running the provisioning of the DevOps environment
 
 if [[ -z "$TENANTID" ]]; then
     az login --username=$AZUREUSERNAME --password=$AZUREPASSWORD
@@ -98,7 +98,7 @@ else
 fi 
 
 
-# Launching the team provisioning in background
-sudo PATH=$PATH:/opt/mssql-tools/bin KVSTORE_DIR=/home/azureuser/team_env/kvstore nohup ./setup.sh -i $SUBID -l $LOCATION -n $TEAMNAME -u "$AZUREUSERNAME" -p "$AZUREPASSWORD" -r "$RECIPIENTEMAIL" -c "$CHATCONNECTIONSTRING" -q "$CHATMESSAGEQUEUE" -t "$TENANTID" -a "$APPID">teamdeploy.out &
+# Launching the DevOps provisioning in background
+sudo PATH=$PATH:/opt/mssql-tools/bin KVSTORE_DIR=/home/azureuser/DevSecOpsEnvironment/kvstore nohup ./setup.sh -i $SUBID -l $LOCATION -n $DEVSECOPSENVNAME -u "$AZUREUSERNAME" -p "$AZUREPASSWORD" -r "$RECIPIENTEMAIL" -c "$CHATCONNECTIONSTRING" -q "$CHATMESSAGEQUEUE" -t "$TENANTID" -a "$APPID">teamdeploy.out &
 
 echo "############### End of custom script ###############"

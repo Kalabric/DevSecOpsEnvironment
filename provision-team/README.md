@@ -1,12 +1,12 @@
-# Team Infrastructure script
+# DevOps Infrastructure script
 
 ## Description
 
-This script is used to install the Openhack team environment for the DevOps OpenHack.  This script will deploy all the necessary resources and configure the environment for a team to participate in the OpenHack.
+This script is used to create the DevOps environment for the DevSecOps workflow.  This script will deploy all the necessary resources and configure the environment to support the My Health application.
 
 ## Pre-requisites
 
-The required pre-requisites for installing a team environment are installed as part of proctor VM Setup.  The [setup script](https://raw.githubusercontent.com/Azure-Samples/openhack-devops-proctor/master/provision-vm/proctorVMSetup.sh) lists all pre-reqs along with required versions.
+The required pre-requisites for installing a DevOps environment are installed as part of DevOps environment VM Setup.  The [setup script](https://github.com/Kalabric/DevSecOpsEnvironment/tree/master/provision-vm/DevOpsEnvVMSetup.sh) lists all pre-reqs along with required versions.
 
 ## Usage
 

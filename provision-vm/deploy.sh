@@ -5,6 +5,19 @@ IFS=$'\n\t'
 # -e: immediately exit if any command has a non-zero exit status
 # -o: prevents errors in a pipeline from being masked
 # IFS new value is less likely to cause confusing bugs when looping arrays or arguments (e.g. $@)
+# This is an optionianal file. Only used if you would like to perform the VM deployment through bash instead of through Azure CLI
+# This script does not take into account the creation of the SP
+# Using these commands:
+# Login to the azure subscription using your credentials
+# az login --username='<AzureUserName>' --password='<AzurePassword>'
+# Create a service principal with the role owner in your subscription
+# az ad sp create-for-rbac -n "DevOpsSP" --role owner
+# Take note of the following: appId password tenant
+# Create new resource group
+# az group create --name='DevOpsVMRG' --location='<Location>'
+# Run the deployment in that resource group using the values from the service principal created in step 2.
+# az group deployment create --resource-group='DevOpsVMRG' --template-file ./azuredeploy.json --parameters spUserName=http://DevOpsSP spPassword='<password>' spTenant='<tenant>' spAppId='<appId>
+# This is also outlined in the Readme.md
 
 usage() { echo "Usage: deploy.sh -l <location> -n <number> -k <publickey>" 1>&2; exit 1; }
 
